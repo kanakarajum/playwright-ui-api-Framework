@@ -9,6 +9,7 @@
     "APITests": "npx playwright test --grep @API",
     "safariNewConfig": "npx playwright test --config playwright.config1.ts --project=safari",
     "webtestsAllure": "npx playwright test --grep @Web --reporter=line,allure-playwright",
+    "apitestsAllure": "npx playwright test --grep @API --reporter=line,allure-playwright",
     "allure:generate": "allure generate allure-results --clean",
     "allure:open": "allure open allure-report"
   },
@@ -17,6 +18,8 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@azure/identity": "^4.14.1",
+    "@azure/playwright": "^1.1.6",
     "@playwright/test": "^1.65.1",
     "@types/node": "^26.6.6",
     "allure": "^3.33.0",

@@ -48,7 +48,7 @@ test.beforeAll(async () => {
 
 })
 
-test('Place an order', async ({ page }) => {
+test('@API - Place an order', async ({ page }) => {
 
     // passing the user token to bypass login
     page.addInitScript(value => {
