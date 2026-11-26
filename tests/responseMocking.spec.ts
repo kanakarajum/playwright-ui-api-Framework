@@ -1,6 +1,6 @@
 
 import { test, expect, request, APIRequestContext } from '@playwright/test';
-import ApiUtils from '../Utils/apiUtils';
+import ApiUtils from '../utils/apiUtils';
 
 const loginDataPayload = {
     userEmail: "imrajuu+test@gmail.com",
