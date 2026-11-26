@@ -22,6 +22,7 @@ This guide explains how to install, configure, and execute the Playwright UI/API
 - [10. Troubleshooting](#10-troubleshooting)
 - [11. Security recommendations](#11-security-recommendations)
 - [12. Useful references](#12-useful-references)
+- [13. Verified GitHub Actions → Azure execution](#13-verified-github-actions--azure-execution)
 
 ---
 
@@ -701,6 +702,77 @@ The existing Jenkinsfile is written for a Windows agent. Use a Windows agent, or
 - [Manage Playwright Workspaces](https://learn.microsoft.com/en-us/azure/app-testing/playwright-workspaces/how-to-manage-playwright-workspace)
 - [GitHub Actions documentation](https://docs.github.com/en/actions)
 - [Jenkins Pipeline documentation](https://www.jenkins.io/doc/book/pipeline/)
+
+---
+
+## 13. Verified GitHub Actions → Azure execution
+
+This section records the end-to-end validation performed for this repository. It is a reference to the actual run, not a claim that every test passed.
+
+### 13.1 Validated execution path
+
+The successful integration path is:
+
+1. A push, pull request, or manual workflow dispatch starts `.github/workflows/playwright.yml`.
+2. GitHub Actions checks out the repository and configures Node.js.
+3. `azure/login@v2` authenticates using the `AZURE_CREDENTIALS` repository secret.
+4. `npm ci` installs the project dependencies.
+5. The workflow runs `npx playwright test --config=playwright.service.config.ts --workers=5`.
+6. The workflow passes `PLAYWRIGHT_SERVICE_URL` to the test process.
+7. The Azure Playwright reporter creates the run and uploads supported diagnostics to the workspace reporting storage.
+8. GitHub Actions uploads the local `playwright-report/` directory as the `playwright-report` artifact.
+
+### 13.2 Verified Azure resources and permissions
+
+The validation used the workspace and storage account documented in section 6.3.
+
+The GitHub Actions service principal was assigned:
+
+- **Playwright Workspace Contributor** at the Playwright Workspace scope, to authorize remote test execution.
+- **Storage Blob Data Contributor** at the associated storage-account scope, to authorize reporting artifact uploads.
+
+For the storage role assignment, use the service principal's **object ID** as `--assignee-object-id`; do not use its application/client ID. The role assignment should be scoped to the storage account associated with the workspace. Azure RBAC changes can take time to propagate.
+
+Example command (replace the placeholders with your own resource details):
+
+```bash
+az role assignment create \
+  --assignee-object-id "<SERVICE_PRINCIPAL_OBJECT_ID>" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Storage Blob Data Contributor" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>/providers/Microsoft.Storage/storageAccounts/<STORAGE_ACCOUNT_NAME>"
+```
+
+### 13.3 Actual validation result
+
+The following run confirms that the GitHub-to-Azure integration and report publishing path worked:
+
+| Item | Result |
+|---|---|
+| GitHub Actions run | [Run #45890826819](https://github.com/kanakarajum/playwright-ui-api-Framework/actions/runs/45890826819) |
+| Azure Playwright test run ID | `63356715-65c8-4bed-873e-e78f54ba7d5a` |
+| Azure report | [Open report in Azure portal](https://ms.portal.azure.com/#view/Microsoft_Azure_CloudNativeTesting/TestReport.ReactView/testRunId/63356715-65c8-4bed-873e-e78f54ba7d5a/resourceId/%2Fsubscriptions%2Fadd32b9a-6288-44a1-8f8c-ec1df5fcb2a4%2Fresourcegroups%2Fpwautomationpractice%2Fproviders%2Fmicrosoft.loadtestservice%2Fplaywrightworkspaces%2Fplaywrightautomation3108) |
+| Test results | 9 passed, 7 failed |
+| Azure reporting upload | Successful |
+| GitHub `playwright-report` artifact upload | Successful |
+| Overall test job | Failed because Playwright returned exit code 1 for failed tests |
+
+**How to interpret this result:** Azure login, workspace test-run creation, and Azure reporting artifact upload all succeeded. The test job is still correctly marked failed because seven tests failed. A report upload success is not a passing test status.
+
+The GitHub Actions artifact can be downloaded from the workflow run's **Artifacts** section. The Azure report provides the Azure-hosted run details and diagnostics.
+
+### 13.4 Re-run and validate the integration
+
+1. Confirm the `AZURE_CREDENTIALS` repository secret is configured and valid.
+2. Confirm `PLAYWRIGHT_SERVICE_URL` contains the full WebSocket endpoint copied from the workspace's **Get Started** page.
+3. Confirm the service principal has the workspace role and storage data role described above.
+4. Open the repository's **Actions** tab and select **Playwright Tests**.
+5. Select **Run workflow**, choose the branch, and start the workflow. The checked-in workflow also runs on pushes and pull requests targeting `main` or `master`.
+6. Open the run and inspect the **Run Playwright tests on Azure** step.
+7. If the Azure report URL appears in the logs, open it and review the test outcomes and diagnostics.
+8. Download the `playwright-report` artifact from the run if it was uploaded.
+
+If report publishing fails with a storage authorization error, troubleshoot the service principal's Storage Blob Data Contributor assignment and scope. If reporting succeeds but the test step fails, inspect the test results; do not treat a test assertion failure as an Azure authentication or storage issue.
 
 ---
 

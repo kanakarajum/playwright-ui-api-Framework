@@ -129,6 +129,18 @@ The GitHub Actions service principal needs the appropriate role on the Playwrigh
 
 **Important:** Azure report publishing and artifact upload can succeed even when some tests fail. Check the test results in the Azure report; a non-zero Playwright test exit code correctly marks the GitHub Actions test step as failed.
 
+### Verified end-to-end Azure execution
+
+The GitHub Actions → Azure Playwright Workspaces integration has been executed successfully with the repository's service-principal authentication and reporting configuration.
+
+- **GitHub Actions run:** [View workflow run #45890826819](https://github.com/kanakarajum/playwright-ui-api-Framework/actions/runs/45890826819)
+- **Azure Playwright test run:** [Open the Azure test report](https://ms.portal.azure.com/#view/Microsoft_Azure_CloudNativeTesting/TestReport.ReactView/testRunId/63356715-65c8-4bed-873e-e78f54ba7d5a/resourceId/%2Fsubscriptions%2Fadd32b9a-6288-44a1-8f8c-ec1df5fcb2a4%2Fresourcegroups%2Fpwautomationpractice%2Fproviders%2Fmicrosoft.loadtestservice%2Fplaywrightworkspaces%2Fplaywrightautomation3108)
+- **Test outcome:** 9 passed and 7 failed in that run.
+- **Azure reporting:** the Azure test run was created and its reporting artifacts were uploaded successfully to the workspace storage account.
+- **GitHub artifact:** the workflow uploaded the `playwright-report` artifact successfully.
+
+The test job remained **failed** because Playwright returned a non-zero exit code for the seven failed tests. This is expected CI behavior; successful Azure authentication, remote browser execution, report publishing, and artifact upload do not mean every test passed. The existing test failures are recorded as the outcome of this validation run and were not changed as part of the Azure integration.
+
 ## Reporting
 
 - **Local / Jenkins:** Allure result files are written to `allure-results/`. Jenkins currently archives these raw result files.
