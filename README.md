@@ -27,6 +27,7 @@ A modular end-to-end automation framework built with **Playwright, TypeScript, a
 - **Jenkins CI:** pipeline for checkout, dependency installation, browser installation, UI test execution, and Allure result archival.
 - **Azure cloud execution:** run Playwright tests using managed browsers in an Azure Playwright Workspace.
 - **GitHub Actions + Azure:** automate cloud test execution on pushes, pull requests, or manual workflow dispatch; publish Azure test reports and upload GitHub artifacts.
+- **GitHub Actions sharding:** distribute the local-browser suite across four independent GitHub-hosted shard jobs, then merge their Playwright blob reports into one HTML report.
 
 ## Project structure
 
@@ -34,7 +35,8 @@ A modular end-to-end automation framework built with **Playwright, TypeScript, a
 playwright-ui-api-Framework/
 ├── .github/
 │   └── workflows/
-│       └── playwright.yml
+│       ├── playwright.yml
+│       └── playwright_docker.yml  # GitHub-hosted sharding workflow (no Docker build)
 ├── pageObjects/
 ├── testData/
 ├── tests/
@@ -129,6 +131,29 @@ The GitHub Actions service principal needs the appropriate role on the Playwrigh
 
 **Important:** Azure report publishing and artifact upload can succeed even when some tests fail. Check the test results in the Azure report; a non-zero Playwright test exit code correctly marks the GitHub Actions test step as failed.
 
+### GitHub Actions + Playwright sharding
+
+The separate workflow `.github/workflows/playwright_docker.yml` runs the base `playwright.config.ts` suite on GitHub-hosted Ubuntu runners. Despite the historical filename, this workflow does **not** build or run Docker containers.
+
+- Uses a matrix of **4 shards** (`1/4` through `4/4`).
+- Each shard runs with **4 Playwright workers**; up to 16 workers can therefore run concurrently across the four GitHub-hosted jobs.
+- Uses `fail-fast: false`, so a failure in one shard does not cancel the remaining shards.
+- Uses Playwright's `blob` reporter and uploads one `blob-report-<shard>` artifact per shard.
+- A dependent `merge-reports` job downloads the blob reports, runs `playwright merge-reports --reporter html`, and uploads one consolidated HTML report.
+- Blob report artifacts are retained for 1 day; the merged HTML report is retained for 14 days.
+
+The workflow can be started manually from **Actions → Playwright Tests using Shards → Run workflow**, and it also runs on pushes and pull requests targeting `main` or `master`.
+
+The sharding command used by each matrix job is:
+
+```bash
+npx playwright test --config=playwright.config.ts --workers=4 --shard=<SHARD_INDEX>/4 --reporter=blob
+```
+
+GitHub Actions supplies the shard index from the matrix. Playwright divides the selected test suite among the shard jobs; the merge job combines their blob reports for a single report view. See the [detailed sharding setup and execution guide](docs/FRAMEWORK-SETUP-AND-EXECUTION.md#14-github-actions-sharded-execution).
+
+**Verified run:** [GitHub Actions run #45902717278](https://github.com/kanakarajum/playwright-ui-api-Framework/actions/runs/45902717278). All four shard jobs completed and uploaded their blob reports. Shard 4 passed; shards 1–3 had test failures. The merge job still completed successfully and uploaded the consolidated HTML report. The overall workflow was marked failed because the test shards reported failures; this confirms report aggregation works even when some tests fail.
+
 ### Verified end-to-end Azure execution
 
 The GitHub Actions → Azure Playwright Workspaces integration has been executed successfully with the repository's service-principal authentication and reporting configuration.
@@ -161,7 +186,7 @@ For the complete, step-by-step instructions—including Jenkins job creation, Az
 - Tag-based test execution
 - Local and cloud browser execution
 - Azure identity and workspace integration
-- Jenkins and GitHub Actions CI/CD
+- Jenkins and GitHub Actions CI/CD, including matrix-based sharding and merged Playwright reports
 - HTML, Allure, and Azure test reporting
 - Failure diagnostics using screenshots and traces
 
