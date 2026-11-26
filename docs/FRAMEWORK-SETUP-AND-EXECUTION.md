@@ -59,7 +59,8 @@ The framework uses:
 | `playwright.service.config.ts` | Azure Playwright Workspaces configuration |
 | `playwright.config1.ts` | Additional browser/project configuration |
 | `Jenkinsfile` | Jenkins pipeline |
-| `.github/workflows/playwright.yml` | GitHub Actions workflow |
+| `.github/workflows/playwright.yml` | GitHub Actions workflow for Azure execution |
+| `.github/workflows/playwright_sharding.yml` | GitHub Actions workflow for parallel sharded execution |
 | `package.json` | Dependencies and execution scripts |
 | `.env` | Optional local environment variables; do not commit |
 
@@ -783,10 +784,8 @@ If report publishing fails with a storage authorization error, troubleshoot the 
 This repository has a second GitHub Actions workflow for parallel execution using Playwright's built-in sharding feature:
 
 ```text
-.github/workflows/playwright_docker.yml
+.github/workflows/playwright_sharding.yml
 ```
-
-> **Naming note:** The filename currently contains `docker`, but the workflow does not use Docker. It runs directly on GitHub-hosted `ubuntu-latest` runners. The filename is retained here to match the checked-in repository path.
 
 Unlike section 8, which runs tests remotely on Azure Playwright Workspaces, this workflow uses the base `playwright.config.ts` and installs browser binaries on GitHub-hosted runners.
 
@@ -917,7 +916,7 @@ For this repository, the base configuration currently declares the Chromium proj
 
 | Capability | GitHub-hosted sharding | Azure Playwright Workspaces |
 |---|---|---|
-| Workflow file | `.github/workflows/playwright_docker.yml` | `.github/workflows/playwright.yml` |
+| Workflow file | `.github/workflows/playwright_sharding.yml` | `.github/workflows/playwright.yml` |
 | Playwright config | `playwright.config.ts` | `playwright.service.config.ts` |
 | Browser execution | GitHub-hosted runner | Azure-managed remote browser |
 | Parallelism | 4 shards × 4 workers in current workflow | 5 workers in current GitHub Actions workflow |

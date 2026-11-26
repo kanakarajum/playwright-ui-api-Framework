@@ -36,7 +36,7 @@ playwright-ui-api-Framework/
 ├── .github/
 │   └── workflows/
 │       ├── playwright.yml
-│       └── playwright_docker.yml  # GitHub-hosted sharding workflow (no Docker build)
+│       └── playwright_sharding.yml
 ├── pageObjects/
 ├── testData/
 ├── tests/
@@ -133,7 +133,7 @@ The GitHub Actions service principal needs the appropriate role on the Playwrigh
 
 ### GitHub Actions + Playwright sharding
 
-The separate workflow `.github/workflows/playwright_docker.yml` runs the base `playwright.config.ts` suite on GitHub-hosted Ubuntu runners. Despite the historical filename, this workflow does **not** build or run Docker containers.
+The separate workflow `.github/workflows/playwright_sharding.yml` runs the base `playwright.config.ts` suite on GitHub-hosted Ubuntu runners.
 
 - Uses a matrix of **4 shards** (`1/4` through `4/4`).
 - Each shard runs with **4 Playwright workers**; up to 16 workers can therefore run concurrently across the four GitHub-hosted jobs.
