@@ -1,12 +1,13 @@
 # Framework Setup and Execution Guide
 
-This guide explains how to install, configure, and execute the Playwright UI/API automation framework in three environments:
+This guide explains how to install, configure, and execute the Playwright UI/API automation framework in four environments:
 
 1. Jenkins CI (local browser execution).
 2. Azure Playwright Workspaces (managed cloud browsers).
 3. GitHub Actions integrated with Azure Playwright Workspaces.
+4. GitHub Actions with parallel Playwright sharding on GitHub-hosted runners.
 
-> **Important:** The existing `Jenkinsfile` runs the web tests on the Jenkins agent. The GitHub Actions workflow runs the tests on Azure Playwright Workspaces. These are separate execution paths and are documented separately below.
+> **Important:** Jenkins runs tests on its agent, the Azure workflow runs tests on Azure Playwright Workspaces, and the sharding workflow runs local-browser tests on GitHub-hosted runners. These are three separate CI execution paths and are documented separately below.
 
 ## Table of contents
 
@@ -23,6 +24,7 @@ This guide explains how to install, configure, and execute the Playwright UI/API
 - [11. Security recommendations](#11-security-recommendations)
 - [12. Useful references](#12-useful-references)
 - [13. Verified GitHub Actions → Azure execution](#13-verified-github-actions--azure-execution)
+- [14. GitHub Actions sharded execution](#14-github-actions-sharded-execution)
 
 ---
 
@@ -773,6 +775,157 @@ The GitHub Actions artifact can be downloaded from the workflow run's **Artifact
 8. Download the `playwright-report` artifact from the run if it was uploaded.
 
 If report publishing fails with a storage authorization error, troubleshoot the service principal's Storage Blob Data Contributor assignment and scope. If reporting succeeds but the test step fails, inspect the test results; do not treat a test assertion failure as an Azure authentication or storage issue.
+
+---
+
+## 14. GitHub Actions sharded execution
+
+This repository has a second GitHub Actions workflow for parallel execution using Playwright's built-in sharding feature:
+
+```text
+.github/workflows/playwright_docker.yml
+```
+
+> **Naming note:** The filename currently contains `docker`, but the workflow does not use Docker. It runs directly on GitHub-hosted `ubuntu-latest` runners. The filename is retained here to match the checked-in repository path.
+
+Unlike section 8, which runs tests remotely on Azure Playwright Workspaces, this workflow uses the base `playwright.config.ts` and installs browser binaries on GitHub-hosted runners.
+
+### 14.1 How the sharding design works
+
+The workflow uses a GitHub Actions matrix to create four independent jobs:
+
+| Shard job | Playwright shard argument | Workers per runner |
+|---|---|---:|
+| Shard 1 | `--shard=1/4` | 4 |
+| Shard 2 | `--shard=2/4` | 4 |
+| Shard 3 | `--shard=3/4` | 4 |
+| Shard 4 | `--shard=4/4` | 4 |
+
+Each job checks out the same commit, installs dependencies and browsers, and runs only its assigned portion of the test suite. With four shard jobs and four workers per job, the workflow can run up to **16 workers concurrently** (subject to GitHub-hosted runner availability and scheduling).
+
+The matrix configuration is:
+
+```yaml
+strategy:
+  fail-fast: false
+  matrix:
+    shardIndex: [1, 2, 3, 4]
+    shardTotal: [4]
+```
+
+- `shardIndex` identifies the current shard.
+- `shardTotal` is the total number of shards.
+- `fail-fast: false` allows the other shard jobs to continue if one shard fails.
+
+Playwright distributes the tests across the shard jobs. Sharding is different from workers: **shards distribute tests across separate CI jobs/runners; workers execute tests concurrently inside each runner.**
+
+### 14.2 Execution command
+
+Each matrix job runs the following command, with GitHub Actions substituting the current matrix values:
+
+```bash
+npx playwright test \
+  --config=playwright.config.ts \
+  --workers=4 \
+  --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} \
+  --reporter=blob
+```
+
+The workflow uses `playwright.config.ts`, not `playwright.service.config.ts`. Therefore this path uses the browser installed on the GitHub-hosted runner; it does not require the Azure workspace URL, Azure login, or Azure credentials.
+
+### 14.3 Why the blob reporter is used
+
+A normal HTML report generated independently by each shard would be separate. The Playwright **blob reporter** creates a report package that can be combined after all shard jobs finish.
+
+The workflow follows this sequence:
+
+1. Each shard executes its assigned tests using `--reporter=blob`.
+2. Each shard uploads a uniquely named artifact: `blob-report-1`, `blob-report-2`, `blob-report-3`, or `blob-report-4`.
+3. The `merge-reports` job waits for the `playwright-tests` matrix jobs.
+4. The merge job downloads all artifacts matching `blob-report-*` into `all-blob-reports`.
+5. It runs:
+
+   ```bash
+   npx playwright merge-reports --reporter html ./all-blob-reports
+   ```
+
+6. The merged report is uploaded as `html-report--attempt-<RUN_ATTEMPT>`.
+
+The configured artifact retention is:
+
+| Artifact | Retention |
+|---|---:|
+| Individual shard blob reports | 1 day |
+| Consolidated HTML report | 14 days |
+
+The merge job uses `if: ${{ !cancelled() }}` so it can still aggregate the available shard reports when one or more shards fail. This is important: **a successful merge job does not mean all tests passed.** The shard job results remain the source of truth for the overall test outcome.
+
+### 14.4 Trigger the sharding workflow
+
+The workflow supports manual and automatic triggers.
+
+**Manual run**
+
+1. Open the repository on GitHub.
+2. Select **Actions**.
+3. Select **Playwright Tests using Shards**.
+4. Select **Run workflow**.
+5. Choose the branch and select **Run workflow** again.
+
+**Automatic runs**
+
+- Push a commit to `main` or `master`.
+- Open or update a pull request targeting `main` or `master`.
+
+### 14.5 Review the sharded run and merged report
+
+1. Open the workflow run in GitHub Actions.
+2. Review the four `playwright-tests` shard jobs independently.
+3. Open a failed shard's **Run Playwright tests** step to inspect its test failures, retries, screenshots, and traces.
+4. Open the `merge-reports` job and confirm that it downloaded the blob artifacts and completed **Merge into HTML Report**.
+5. Download the `html-report--attempt-<RUN_ATTEMPT>` artifact from the run's **Artifacts** section.
+6. Open the extracted HTML report locally to review the combined results from all available shards.
+
+**Verified execution:** [Run #45902717278](https://github.com/kanakarajum/playwright-ui-api-Framework/actions/runs/45902717278), triggered by a push to `master`.
+
+| Component | Observed result |
+|---|---|
+| Shard 1 | Completed; tests failed |
+| Shard 2 | Completed; tests failed |
+| Shard 3 | Completed; tests failed |
+| Shard 4 | Completed; all tests in this shard passed |
+| Blob report uploads | All four shard artifacts uploaded |
+| Merge job | Successful |
+| Consolidated HTML artifact | Uploaded successfully |
+| Overall workflow | Failed because three shard jobs reported test failures |
+
+The failed tests showed application/test issues such as dialog handling, strict-mode locator matches, and locator timeouts. The sharding infrastructure itself worked: all four jobs ran, each uploaded its blob report, and the merge job produced the consolidated HTML report. These test failures were not changed as part of the sharding documentation.
+
+### 14.6 Tuning shard and worker counts
+
+The current configuration is four shards with four workers per shard. Tune these values based on suite size, GitHub runner limits, test isolation, application capacity, and observed execution time.
+
+- Increase the number of shards when the suite is large enough to benefit from additional independent runners.
+- Adjust `--workers` to control concurrency inside each runner.
+- Avoid increasing both values without considering the combined concurrency. For example, 4 shards × 4 workers means up to 16 concurrent tests.
+- Keep `fail-fast: false` when you want all shards to finish and produce diagnostics even if some tests fail.
+- Review test isolation and shared test data before increasing parallelism; tests that modify the same account or application state may interfere with one another.
+
+For this repository, the base configuration currently declares the Chromium project. The workflow's browser installation step can be made more efficient by installing only Chromium (for example, `npx playwright install --with-deps chromium`) rather than downloading every supported browser.
+
+### 14.7 Sharding versus Azure cloud execution
+
+| Capability | GitHub-hosted sharding | Azure Playwright Workspaces |
+|---|---|---|
+| Workflow file | `.github/workflows/playwright_docker.yml` | `.github/workflows/playwright.yml` |
+| Playwright config | `playwright.config.ts` | `playwright.service.config.ts` |
+| Browser execution | GitHub-hosted runner | Azure-managed remote browser |
+| Parallelism | 4 shards × 4 workers in current workflow | 5 workers in current GitHub Actions workflow |
+| Authentication | No Azure login required | Azure service principal via GitHub Secrets |
+| Reporting | Blob reports merged into one HTML report | Azure Playwright reporter plus GitHub artifact |
+| Main use | Parallelize local-browser CI tests | Execute tests on managed Azure browsers |
+
+Use the sharding workflow when you want to distribute the suite across GitHub-hosted runners. Use the Azure workflow when you want managed remote browsers and Azure-hosted test reporting. They are independent workflows and can be run separately.
 
 ---
 
