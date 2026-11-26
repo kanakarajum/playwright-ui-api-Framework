@@ -10,6 +10,7 @@
     "safariNewConfig": "npx playwright test --config playwright.config1.ts --project=safari",
     "webtestsAllure": "npx playwright test --grep @Web --reporter=line,allure-playwright",
     "apitestsAllure": "npx playwright test --grep @API --reporter=line,allure-playwright",
+    "runTestsOnAzure":"npx playwright test --config=playwright.service.config.ts --workers=10",
     "allure:generate": "allure generate allure-results --clean",
     "allure:open": "allure open allure-report"
   },
@@ -23,6 +24,7 @@
     "@playwright/test": "^1.65.1",
     "@types/node": "^26.6.6",
     "allure": "^3.33.0",
-    "allure-playwright": "^3.15.0"
+    "allure-playwright": "^3.15.0",
+    "dotenv": "^18.0.10"
   }
 }

@@ -9,3 +9,4 @@ node_modules/
 # Allure reports
 allure-results/
 allure-report/
+.env
