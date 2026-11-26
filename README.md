@@ -1,96 +1,47 @@
 # Enterprise Playwright UI & API Automation Framework
 
-A scalable, modular test automation framework built using **Playwright, TypeScript, and Node.js**, supporting UI automation, API testing, reusable test architecture, CI/CD integration, and cloud-based execution through **Azure Playwright Service**.
+A modular end-to-end automation framework built with **Playwright, TypeScript, and Node.js**. It supports UI automation, API testing, reusable test architecture, local and CI execution, and cloud browser execution through **Azure Playwright Workspaces**.
 
-The framework demonstrates enterprise automation practices, including Page Object Model (POM), reusable utilities, test configuration management, parallel execution, reporting, and cloud-based browser execution.
+## Architecture and technology stack
 
-## Architecture & Technology Stack
-
-| Component | Technology |
+| Area | Technology |
 |---|---|
-| Automation Framework | Playwright |
-| Programming Language | TypeScript |
-| UI Automation | Playwright |
-| API Automation | Playwright APIRequestContext |
-| Design Pattern | Page Object Model (POM) |
-| Test Organization | Tag-based execution |
-| Test Reporting | Allure Reports |
-| CI/CD | Jenkins |
-| Cloud Execution | Azure Playwright Service |
-| Authentication | Azure Identity / DefaultAzureCredential |
-| Browser Automation | Chromium, Microsoft Edge |
-| Package Management | npm |
+| Automation | Playwright Test |
+| Language / runtime | TypeScript / Node.js |
+| UI testing | Playwright |
+| API testing | Playwright APIRequestContext |
+| Design pattern | Page Object Model (POM) |
+| Test organization | Tag-based execution (`@Web`, `@API`) |
+| Reporting | Playwright HTML, Allure, Azure Playwright reporter |
+| CI/CD | Jenkins, GitHub Actions |
+| Cloud browsers | Azure Playwright Workspaces |
+| Azure authentication | Azure Identity / Azure CLI locally; Azure Login in GitHub Actions |
+| Package manager | npm |
 
-## Key Features
+## Key capabilities
 
-### 1. UI Automation
-- End-to-end browser automation using Playwright.
-- Page Object Model for maintainable and reusable test components.
-- Centralized locators and page-level actions.
-- Browser and device configuration.
-- Screenshots and execution traces for failure analysis.
+- **UI automation:** reusable page objects, centralized locators/actions, browser configuration, screenshots and traces.
+- **API automation:** API request testing, reusable API utilities, and test-data support.
+- **Framework architecture:** modular tests, utilities, helpers, types, test data, and centralized configuration.
+- **Local execution:** run the full suite, UI-only tests, or API-only tests.
+- **Jenkins CI:** pipeline for checkout, dependency installation, browser installation, UI test execution, and Allure result archival.
+- **Azure cloud execution:** run Playwright tests using managed browsers in an Azure Playwright Workspace.
+- **GitHub Actions + Azure:** automate cloud test execution on pushes, pull requests, or manual workflow dispatch; publish Azure test reports and upload GitHub artifacts.
 
-### 2. API Automation
-- API testing using Playwright's request capabilities.
-- Support for independent API test execution.
-- Reusable API utilities and test-data management.
-- Tag-based separation of UI and API test suites.
-
-### 3. Framework Architecture
-- Modular framework structure.
-- Reusable utilities, helpers, and shared components.
-- Centralized test configuration.
-- Test data and TypeScript type management.
-- Parallel execution and configurable retry mechanisms.
-
-### 4. Azure Cloud Integration
-Integrated with **Azure Playwright Service** to enable cloud-based browser test execution.
-
-Key capabilities:
-- Integration with Azure Playwright using `@azure/playwright`.
-- Azure authentication using `@azure/identity` and `DefaultAzureCredential`.
-- Azure Playwright workspace connectivity.
-- Configurable connection timeout and network exposure.
-- Execution against managed cloud browser infrastructure.
-
-The framework supports local execution as well as Azure-based execution through separate Playwright configurations.
-
-### 5. CI/CD Integration
-- Jenkins pipeline integration.
-- Automated dependency installation.
-- Playwright browser installation.
-- Automated UI test execution.
-- Allure result artifact collection.
-
-### 6. Test Reporting
-- Allure Playwright integration.
-- Execution results and failure reporting.
-- Screenshots and traces for troubleshooting.
-- HTML reporting support.
-
-## Project Structure
+## Project structure
 
 ```text
 playwright-ui-api-Framework/
-│
 ├── .github/
 │   └── workflows/
-│
+│       └── playwright.yml
 ├── pageObjects/
-│   └── Page-level automation components
-│
 ├── testData/
-│   └── Test data and configurations
-│
 ├── tests/
-│   └── UI and API test scenarios
-│
 ├── types/
-│   └── TypeScript type definitions
-│
 ├── utils/
-│   └── Reusable framework utilities
-│
+├── docs/
+│   └── FRAMEWORK-SETUP-AND-EXECUTION.md
 ├── playwright.config.ts
 ├── playwright.config1.ts
 ├── playwright.service.config.ts
@@ -99,127 +50,113 @@ playwright-ui-api-Framework/
 └── README.md
 ```
 
-*Note: `playwright.service.config.ts` represents the Azure configuration file; adjust the filename if your actual file uses a different name.*
-
 ## Prerequisites
 
-- Node.js 22+
-- npm
-- Git
-- Azure subscription
-- Azure Playwright workspace
-- Azure CLI (for local Azure CLI authentication)
+- Node.js 22 or a compatible supported Node.js release
+- npm and Git
+- Playwright browser binaries for local browser execution
+- Azure subscription and Azure Playwright Workspace for cloud execution
+- Azure CLI for local Azure authentication
+- Jenkins or GitHub Actions for CI/CD execution
 
 ## Installation
 
-Clone the repository:
-
 ```bash
 git clone https://github.com/kanakarajum/playwright-ui-api-Framework.git
-
 cd playwright-ui-api-Framework
-```
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Install Playwright browsers:
-
-```bash
+npm ci
 npx playwright install
 ```
 
-## Execution Commands
+Install local browser binaries with `npx playwright install` when running browsers on your machine or Jenkins agent. Azure Workspaces provides remote browsers, so local browser installation is not needed just to submit a remote Azure run.
 
-### Local execution
+## Execution commands
 
-Run all tests:
+| Purpose | Command |
+|---|---|
+| Run all tests locally | `npm run regression` |
+| Run UI tests | `npm run webtests` |
+| Run API tests | `npm run APITests` |
+| Run the additional browser configuration | `npm run safariNewConfig` |
+| Run tests on Azure Workspaces | `npm run runTestsOnAzure` |
+| Generate Allure report | `npm run allure:generate` |
+| Open Allure report | `npm run allure:open` |
 
-```bash
-npm run regression
-```
+The tag-based scripts select tests using `@Web` and `@API`. See `package.json` for the exact commands.
 
-Run UI tests:
+## Azure Playwright Workspaces
 
-```bash
-npm run webtests
-```
+The Azure configuration is maintained separately in `playwright.service.config.ts`. It reuses the base Playwright configuration, connects to managed Azure browsers using `@azure/playwright`, and configures the Azure Playwright reporter.
 
-Run API tests:
+For local Azure execution:
 
-```bash
-npm run APITests
-```
+1. Sign in using Azure CLI: `az login`.
+2. Set the correct subscription if necessary: `az account set --subscription "<SUBSCRIPTION_ID>"`.
+3. Set `PLAYWRIGHT_SERVICE_URL` to the WebSocket endpoint copied from your Azure Playwright Workspace.
+4. Ensure the signed-in identity has the required workspace permissions.
+5. Run `npm run runTestsOnAzure`.
 
-### Azure Playwright Service execution
+Do not commit credentials or local `.env` files.
 
-Authenticate with Azure:
+## CI/CD
 
-```bash
-az login
-```
+### Jenkins
 
-Verify the active subscription:
+The checked-in `Jenkinsfile` runs tests locally on the Jenkins agent. It checks out source, runs `npm ci`, installs Playwright browsers, executes `npm run webtestsAllure`, and archives `allure-results/**`.
 
-```bash
-az account show
-```
+The current Jenkinsfile uses Windows `bat` steps and expects a Jenkins NodeJS tool named `NodeJS-22`. Use a Windows agent as configured, or adapt the steps for a Linux agent.
 
-Execute tests using the Azure Playwright configuration:
+### GitHub Actions + Azure
 
-```bash
-npx playwright test --config=playwright.service.config.ts
-```
+The workflow `.github/workflows/playwright.yml`:
 
-*Ensure the Azure workspace configuration, authentication permissions, and required environment settings are configured before execution.*
+- Runs on pushes to `main` or `master`, pull requests targeting those branches, and manual dispatch.
+- Authenticates to Azure using `azure/login@v2` and the `AZURE_CREDENTIALS` GitHub repository secret.
+- Installs npm dependencies with `npm ci`.
+- Runs `npx playwright test --config=playwright.service.config.ts --workers=5`.
+- Passes the Azure browser endpoint through the `PLAYWRIGHT_SERVICE_URL` repository variable.
+- Publishes test reporting through the Azure Playwright reporter.
+- Uploads the local `playwright-report/` folder as a GitHub Actions artifact when available.
+
+Configure these under **GitHub repository → Settings → Secrets and variables → Actions**:
+
+| Type | Name | Value |
+|---|---|---|
+| Repository secret | `AZURE_CREDENTIALS` | Azure service principal JSON containing `clientId`, `clientSecret`, `subscriptionId`, and `tenantId` |
+| Repository variable | `PLAYWRIGHT_SERVICE_URL` | Full WebSocket endpoint copied from the Azure Playwright Workspace |
+
+The GitHub Actions service principal needs the appropriate role on the Playwright Workspace to execute tests. For Azure reporting artifact uploads, assign **Storage Blob Data Contributor** on the associated reporting storage account to that same service principal. Use least-privilege role assignments and store credentials only in GitHub Secrets.
+
+**Important:** Azure report publishing and artifact upload can succeed even when some tests fail. Check the test results in the Azure report; a non-zero Playwright test exit code correctly marks the GitHub Actions test step as failed.
 
 ## Reporting
 
-Generate Allure report:
+- **Local / Jenkins:** Allure result files are written to `allure-results/`. Jenkins currently archives these raw result files.
+- **Azure:** Azure Playwright reporter publishes the run and supported diagnostic artifacts to the workspace reporting experience.
+- **GitHub Actions:** the workflow uploads `playwright-report/` as a downloadable artifact (30-day retention in the current workflow).
 
-```bash
-npm run allure:generate
-```
+## Detailed setup guide
 
-Open Allure report:
+For the complete, step-by-step instructions—including Jenkins job creation, Azure workspace setup, local Azure execution, GitHub secrets and variables, Azure role assignments, workflow execution, reporting, and troubleshooting—see:
 
-```bash
-npm run allure:open
-```
+**[Framework Setup and Execution Guide](docs/FRAMEWORK-SETUP-AND-EXECUTION.md)**
 
-Playwright HTML reporting can also be enabled through the corresponding Playwright configuration.
+## Engineering practices demonstrated
 
-## CI/CD Pipeline
-
-The framework includes a Jenkins pipeline with the following stages:
-
-1. Source code checkout.
-2. Dependency installation.
-3. Playwright browser installation.
-4. UI test execution.
-5. Allure execution result archival.
-
-## Engineering Practices Demonstrated
-
-- Enterprise-style test automation architecture.
-- UI and API automation integration.
-- Reusable Page Object Model.
-- TypeScript-based framework design.
-- Cloud-based browser execution.
-- Azure identity and authentication integration.
-- CI/CD pipeline integration.
-- Automated test reporting and failure diagnostics.
-- Separation of framework configuration and test implementation.
+- Enterprise-style Playwright framework architecture
+- UI and API automation in one TypeScript project
+- Reusable Page Object Model and utilities
+- Tag-based test execution
+- Local and cloud browser execution
+- Azure identity and workspace integration
+- Jenkins and GitHub Actions CI/CD
+- HTML, Allure, and Azure test reporting
+- Failure diagnostics using screenshots and traces
 
 ## Author
 
-**Kanak Raju Mulakalapalli**
-
+**Kanak Raju Mulakalapalli**  
 AI Automation Architect | Lead SDET | Quality Engineering
 
-GitHub: https://github.com/kanakarajum
-
-LinkedIn: https://www.linkedin.com/in/kanakarajum/
+- GitHub: [kanakarajum](https://github.com/kanakarajum)
+- LinkedIn: [kanakarajum](https://www.linkedin.com/in/kanakarajum/)
